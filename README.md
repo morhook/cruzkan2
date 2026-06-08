@@ -1,51 +1,46 @@
-# DOS Wolfenstein-style demo for Turbo C
+# CRUZKAN2
 
-This is a small **Wolfenstein-like raycasting game** written in C for **Turbo C / DOS**.
+A Wolfenstein-style raycasting demo written in C for DOS. **Now cruzkanoid goes to 3D!**
 
-It is not a full Wolfenstein 3D clone, but it does provide:
-- a 3D maze view
-- textured-by-color walls
-- movement and turning
-- strafing
-- VGA Mode 13h graphics (320x200, 256 colors)
-- direct keyboard handling for real-time controls
+This is the first step toward a 3D sequel of [cruzkanoid](https://github.com/morhook/cruzkanoid). It is not a full Wolfenstein 3D clone, but it renders a real-time first-person view of a maze using classic raycasting.
 
-## Files
-
-- `dos_wolf.c` - main source file
+## Features
+- 320x200 VGA graphics (Mode 13h, 256 colors)
+- Real-time raycasting 3D maze view
+- Color-shaded walls (lit/dark sides for a sense of depth)
+- 16x16 tile-based map
+- Movement and turning
+- Strafing
+- Interrupt-driven keyboard handler for smooth real-time controls
 
 ## Controls
+- W: Move forward
+- S: Move backward
+- A: Turn left
+- D: Turn right
+- Q: Strafe left
+- E: Strafe right
+- Esc: Quit game
 
-- `W` / `S` - move forward / backward
-- `A` / `D` - turn left / right
-- `Q` / `E` - strafe left / right
-- `Esc` - quit
+## Running on your machine
 
-## How to build in Turbo C
+Run the game in a real DOS machine, DOSBox or DOSBox-X:
+```sh
+cruzkan2.exe
+```
 
+## Building in Turbo C
 1. Open Turbo C.
-2. Create a new project or open `dos_wolf.c` directly.
+2. Create a new project or open `cruzkan2.c` directly.
 3. Compile and run.
 
 Typical Turbo C settings:
 - Memory model: **Small** is fine.
 - Graphics library is **not required**.
-- Math library is used automatically by Turbo C during link.
+- Math library is linked automatically by Turbo C.
 
-## Notes
-
-- The game uses a classic **raycasting** technique similar to early FPS games.
-- Rendering is intentionally simple so it can work in a DOS/Turbo C environment.
-- For best results, run it in **DOSBox** or a real DOS-compatible setup.
-
-## Possible next upgrades
-
-If you want, I can also extend this into a bigger DOS game with:
-- enemies
-- doors
-- shooting
-- a minimap
-- wall textures
-- sprites
-- level loading from a file
-- sound effects with PC speaker or Sound Blaster
+## Technical Details
+- Uses VGA Mode 13h (320x200, 256 colors)
+- Direct VGA memory manipulation at `0xA000:0000`
+- Interrupt-driven keyboard handler for real-time input
+- Raycasting renderer casting 160 rays across 2-pixel-wide columns
