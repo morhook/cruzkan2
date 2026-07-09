@@ -23,6 +23,10 @@
 #define SC_S 31
 #define SC_A 30
 #define SC_D 32
+#define SC_LEFT 75
+#define SC_RIGHT 77
+#define SC_UP 72
+#define SC_DOWN 80
 
 #define COL_SKY 20
 #define COL_FLOOR 21
@@ -249,22 +253,22 @@ void try_move(double dx, double dy)
 
 void update_player(void)
 {
-    if (keys[SC_W]) {
+    if (keys[SC_W] || keys[SC_UP]) {
         try_move(dirX * MOVE_SPEED, dirY * MOVE_SPEED);
     }
-    if (keys[SC_S]) {
+    if (keys[SC_S] || keys[SC_DOWN]) {
         try_move(-dirX * MOVE_SPEED, -dirY * MOVE_SPEED);
     }
-    if (keys[SC_Q]) {
+    if (keys[SC_D]) {
         try_move(-dirY * STRAFE_SPEED, dirX * STRAFE_SPEED);
     }
-    if (keys[SC_E]) {
+    if (keys[SC_A]) {
         try_move(dirY * STRAFE_SPEED, -dirX * STRAFE_SPEED);
     }
-    if (keys[SC_A]) {
+    if (keys[SC_LEFT]) {
         rotate_player(-ROT_SPEED);
     }
-    if (keys[SC_D]) {
+    if (keys[SC_RIGHT]) {
         rotate_player(ROT_SPEED);
     }
 }
@@ -374,11 +378,11 @@ void render_frame(void)
 int main(void)
 {
     clrscr();
-    cprintf("DOS raycaster demo for Turbo C\r\n");
+    cprintf("Cruzkan2 demo for Turbo C\r\n");
     cprintf("--------------------------------\r\n\r\n");
     cprintf("W/S : move forward/back\r\n");
-    cprintf("A/D : turn left/right\r\n");
-    cprintf("Q/E : strafe left/right\r\n");
+    cprintf("A/D : strafe left/right\r\n");
+    cprintf("Up/Down/Left/Right : move forward/back turn left/right\r\n");
     cprintf("ESC : quit\r\n\r\n");
     cprintf("Press any key to start...");
     getch();
