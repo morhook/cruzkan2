@@ -14,12 +14,12 @@ This is the first step toward a 3D sequel of [cruzkanoid](https://github.com/mor
 - Interrupt-driven keyboard handler for smooth real-time controls
 
 ## Controls
-- W: Move forward
-- S: Move backward
-- A: Turn left
-- D: Turn right
-- Q: Strafe left
-- E: Strafe right
+- W/Up: Move forward
+- S/Down: Move backward
+- A: Strafe left
+- D: Strafe right
+- Left: Turn left
+- Right: Turn right
 - Esc: Quit game
 
 ## Running on your machine
