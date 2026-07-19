@@ -7,7 +7,8 @@ This is the first step toward a 3D sequel of [cruzkanoid](https://github.com/mor
 ## Features
 - 320x200 VGA graphics (Mode 13h, 256 colors)
 - Real-time raycasting 3D maze view
-- Color-shaded walls (lit/dark sides for a sense of depth)
+- Textured walls with distinct brick, stone, metal, and gold patterns
+- Color-shaded wall sides for a sense of depth
 - 16x16 tile-based map
 - Movement and turning
 - Strafing
@@ -42,5 +43,6 @@ Typical Turbo C settings:
 ## Technical Details
 - Uses VGA Mode 13h (320x200, 256 colors)
 - Direct VGA memory manipulation at `0xA000:0000`
+- Embedded 32x32 indexed-color wall textures
 - Interrupt-driven keyboard handler for real-time input
 - Raycasting renderer casting 160 rays across 2-pixel-wide columns

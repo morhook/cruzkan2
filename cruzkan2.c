@@ -1,13 +1,16 @@
 #include <dos.h>
 #include <conio.h>
 #include <math.h>
-#include <stdio.h>
 
 #define SCREEN_W 320
 #define SCREEN_H 200
 #define HALF_H 100
 #define NUM_RAYS 160
 #define COLUMN_W 2
+#define TEX_W 32
+#define TEX_H 32
+#define TEX_SIZE (TEX_W * TEX_H)
+#define NUM_TEXTURES 4
 
 #define MAP_W 16
 #define MAP_H 16
@@ -15,6 +18,7 @@
 #define MOVE_SPEED 0.10
 #define STRAFE_SPEED 0.08
 #define ROT_SPEED 0.08
+#define RAY_EPSILON 0.000001
 
 #define SC_ESC 1
 #define SC_W 17
@@ -30,18 +34,16 @@
 
 #define COL_SKY 20
 #define COL_FLOOR 21
-#define COL_RED_LIT 22
-#define COL_RED_DARK 23
-#define COL_STONE_LIT 24
-#define COL_STONE_DARK 25
-#define COL_BLUE_LIT 26
-#define COL_BLUE_DARK 27
-#define COL_GOLD_LIT 28
-#define COL_GOLD_DARK 29
+#define COL_TEXTURE_BASE 22
+
+#define SHADE_DARK 0
+#define SHADE_BASE 1
+#define SHADE_LIGHT 2
 
 unsigned char far *VGA = (unsigned char far *)MK_FP(0xA000, 0);
 volatile unsigned char keys[128];
 void interrupt (*old_key_handler)();
+unsigned char wall_textures[NUM_TEXTURES][TEX_SIZE];
 
 double posX = 3.5;
 double posY = 3.5;
@@ -77,8 +79,10 @@ void install_keyboard(void);
 void remove_keyboard(void);
 void interrupt keyboard_handler(void);
 int is_wall(int x, int y);
-unsigned char wall_color(char tile, int side);
-void draw_column(int x, int draw_start, int draw_end, unsigned char color);
+int texture_index(char tile);
+void init_textures(void);
+void draw_column(int x, int draw_start, int draw_end, int line_height,
+                 char tile, int side, int tex_x);
 void rotate_player(double angle);
 void try_move(double dx, double dy);
 void update_player(void);
@@ -105,17 +109,33 @@ void init_palette(void)
     set_palette(COL_SKY, 10, 18, 30);
     set_palette(COL_FLOOR, 12, 10, 10);
 
-    set_palette(COL_RED_LIT, 40, 8, 8);
-    set_palette(COL_RED_DARK, 22, 4, 4);
+    set_palette(22, 20, 3, 3);
+    set_palette(23, 40, 8, 8);
+    set_palette(24, 55, 16, 12);
+    set_palette(25, 10, 2, 2);
+    set_palette(26, 22, 4, 4);
+    set_palette(27, 32, 8, 6);
 
-    set_palette(COL_STONE_LIT, 34, 34, 38);
-    set_palette(COL_STONE_DARK, 18, 18, 22);
+    set_palette(28, 16, 16, 18);
+    set_palette(29, 34, 34, 38);
+    set_palette(30, 48, 48, 52);
+    set_palette(31, 8, 8, 10);
+    set_palette(32, 18, 18, 22);
+    set_palette(33, 28, 28, 32);
 
-    set_palette(COL_BLUE_LIT, 10, 18, 42);
-    set_palette(COL_BLUE_DARK, 5, 8, 24);
+    set_palette(34, 4, 9, 20);
+    set_palette(35, 10, 18, 42);
+    set_palette(36, 20, 34, 55);
+    set_palette(37, 2, 4, 11);
+    set_palette(38, 5, 8, 24);
+    set_palette(39, 10, 17, 32);
 
-    set_palette(COL_GOLD_LIT, 42, 32, 10);
-    set_palette(COL_GOLD_DARK, 24, 18, 5);
+    set_palette(40, 22, 14, 4);
+    set_palette(41, 42, 32, 10);
+    set_palette(42, 58, 48, 20);
+    set_palette(43, 12, 7, 2);
+    set_palette(44, 24, 18, 5);
+    set_palette(45, 34, 26, 9);
 }
 
 void wait_retrace(void)
@@ -170,46 +190,133 @@ int is_wall(int x, int y)
     return world[y][x] != '0';
 }
 
-unsigned char wall_color(char tile, int side)
+int texture_index(char tile)
 {
     switch (tile) {
         case '1':
-            return side ? COL_RED_DARK : COL_RED_LIT;
+            return 0;
         case '2':
-            return side ? COL_STONE_DARK : COL_STONE_LIT;
+            return 1;
         case '3':
-            return side ? COL_BLUE_DARK : COL_BLUE_LIT;
+            return 2;
         case '4':
-            return side ? COL_GOLD_DARK : COL_GOLD_LIT;
+            return 3;
     }
-    return side ? COL_STONE_DARK : COL_STONE_LIT;
+    return 1;
 }
 
-void draw_column(int x, int draw_start, int draw_end, unsigned char color)
+void init_textures(void)
+{
+    int x;
+    int y;
+    int offset;
+    int local_x;
+    int local_y;
+    int shade;
+
+    for (y = 0; y < TEX_H; ++y) {
+        for (x = 0; x < TEX_W; ++x) {
+            offset = y * TEX_W + x;
+
+            local_x = (x + ((y / 8) & 1) * 8) & 15;
+            local_y = y & 7;
+            if (local_x == 0 || local_y == 0) {
+                shade = SHADE_DARK;
+            } else if (local_y == 1) {
+                shade = SHADE_LIGHT;
+            } else {
+                shade = SHADE_BASE;
+            }
+            wall_textures[0][offset] = (unsigned char)shade;
+
+            local_x = (x + ((y / 8) & 1) * 5) & 15;
+            local_y = y & 7;
+            if (local_x == 0 || local_y == 0) {
+                shade = SHADE_DARK;
+            } else if (((x * 3 + y * 5 + (x ^ y)) & 15) < 3) {
+                shade = SHADE_LIGHT;
+            } else {
+                shade = SHADE_BASE;
+            }
+            wall_textures[1][offset] = (unsigned char)shade;
+
+            local_x = x & 15;
+            local_y = y & 15;
+            if (local_x == 0 || local_y == 0) {
+                shade = SHADE_DARK;
+            } else if ((local_x == 2 || local_x == 13) &&
+                       (local_y == 2 || local_y == 13)) {
+                shade = SHADE_LIGHT;
+            } else if (local_x == 1 || local_y == 1) {
+                shade = SHADE_LIGHT;
+            } else {
+                shade = SHADE_BASE;
+            }
+            wall_textures[2][offset] = (unsigned char)shade;
+
+            local_x = (x + ((y / 8) & 1) * 8) & 15;
+            local_y = y & 7;
+            if (local_x == 0 || local_y == 0) {
+                shade = SHADE_DARK;
+            } else if (local_x == 1 || local_y == 1) {
+                shade = SHADE_LIGHT;
+            } else {
+                shade = SHADE_BASE;
+            }
+            wall_textures[3][offset] = (unsigned char)shade;
+        }
+    }
+}
+
+void draw_column(int x, int draw_start, int draw_end, int line_height,
+                 char tile, int side, int tex_x)
 {
     int y;
+    int texture;
+    int tex_y;
+    int wall_start;
+    int wall_end;
+    unsigned char shade;
+    unsigned char color;
     unsigned int offset;
+    long tex_step;
+    long tex_pos;
 
-    if (draw_start < 0) {
-        draw_start = 0;
-    }
-    if (draw_end >= SCREEN_H) {
-        draw_end = SCREEN_H - 1;
+    if (line_height < 1) {
+        line_height = 1;
     }
 
-    for (y = 0; y < draw_start; ++y) {
+    wall_start = draw_start;
+    wall_end = draw_end;
+    if (wall_start < 0) {
+        wall_start = 0;
+    }
+    if (wall_end >= SCREEN_H) {
+        wall_end = SCREEN_H - 1;
+    }
+
+    for (y = 0; y < wall_start; ++y) {
         offset = (y << 8) + (y << 6) + x;
         VGA[offset] = COL_SKY;
         VGA[offset + 1] = COL_SKY;
     }
 
-    for (y = draw_start; y <= draw_end; ++y) {
+    texture = texture_index(tile);
+    tex_step = ((long)TEX_H << 16) / line_height;
+    tex_pos = (long)(wall_start - draw_start) * tex_step;
+
+    for (y = wall_start; y <= wall_end; ++y) {
+        tex_y = (int)(tex_pos >> 16) & (TEX_H - 1);
+        shade = wall_textures[texture][tex_y * TEX_W + tex_x];
+        color = (unsigned char)(COL_TEXTURE_BASE + texture * 6 +
+                                side * 3 + shade);
         offset = (y << 8) + (y << 6) + x;
         VGA[offset] = color;
         VGA[offset + 1] = color;
+        tex_pos += tex_step;
     }
 
-    for (y = draw_end + 1; y < SCREEN_H; ++y) {
+    for (y = wall_end + 1; y < SCREEN_H; ++y) {
         offset = (y << 8) + (y << 6) + x;
         VGA[offset] = COL_FLOOR;
         VGA[offset + 1] = COL_FLOOR;
@@ -288,6 +395,7 @@ void render_frame(void)
         double deltaDistX;
         double deltaDistY;
         double perpWallDist;
+        double wallX;
         int stepX;
         int stepY;
         int hit;
@@ -295,8 +403,8 @@ void render_frame(void)
         int lineHeight;
         int drawStart;
         int drawEnd;
+        int texX;
         char tile;
-        unsigned char color;
         int screenX;
 
         cameraX = (2.0 * col) / (double)NUM_RAYS - 1.0;
@@ -306,13 +414,13 @@ void render_frame(void)
         mapX = (int)posX;
         mapY = (int)posY;
 
-        if (rayDirX == 0.0) {
+        if (fabs(rayDirX) < RAY_EPSILON) {
             deltaDistX = 1.0e30;
         } else {
             deltaDistX = fabs(1.0 / rayDirX);
         }
 
-        if (rayDirY == 0.0) {
+        if (fabs(rayDirY) < RAY_EPSILON) {
             deltaDistY = 1.0e30;
         } else {
             deltaDistY = fabs(1.0 / rayDirY);
@@ -354,9 +462,9 @@ void render_frame(void)
         }
 
         if (side == 0) {
-            perpWallDist = (mapX - posX + (1 - stepX) * 0.5) / rayDirX;
+            perpWallDist = sideDistX - deltaDistX;
         } else {
-            perpWallDist = (mapY - posY + (1 - stepY) * 0.5) / rayDirY;
+            perpWallDist = sideDistY - deltaDistY;
         }
 
         if (perpWallDist < 0.1) {
@@ -364,14 +472,35 @@ void render_frame(void)
         }
 
         lineHeight = (int)(SCREEN_H / perpWallDist);
+        if (lineHeight < 1) {
+            lineHeight = 1;
+        }
         drawStart = HALF_H - lineHeight / 2;
-        drawEnd = HALF_H + lineHeight / 2;
+        drawEnd = drawStart + lineHeight - 1;
+
+        if (side == 0) {
+            wallX = posY + perpWallDist * rayDirY;
+        } else {
+            wallX = posX + perpWallDist * rayDirX;
+        }
+        wallX -= floor(wallX);
+        texX = (int)(wallX * TEX_W);
+        if (texX < 0) {
+            texX = 0;
+        } else if (texX >= TEX_W) {
+            texX = TEX_W - 1;
+        }
+
+        if ((side == 0 && rayDirX > 0) ||
+            (side == 1 && rayDirY < 0)) {
+            texX = TEX_W - texX - 1;
+        }
 
         tile = world[mapY][mapX];
-        color = wall_color(tile, side);
         screenX = col * COLUMN_W;
 
-        draw_column(screenX, drawStart, drawEnd, color);
+        draw_column(screenX, drawStart, drawEnd, lineHeight,
+                    tile, side, texX);
     }
 }
 
@@ -390,6 +519,7 @@ int main(void)
     install_keyboard();
     set_video_mode(0x13);
     init_palette();
+    init_textures();
 
     while (!keys[SC_ESC]) {
         update_player();
