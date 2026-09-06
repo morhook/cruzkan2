@@ -18,6 +18,8 @@
 #define MOVE_SPEED 0.10
 #define STRAFE_SPEED 0.08
 #define ROT_SPEED 0.08
+#define MOUSE_TURN_SENSITIVITY 0.003
+#define MOUSE_MOVE_SENSITIVITY 0.01
 #define RAY_EPSILON 0.000001
 
 #define SC_ESC 1
@@ -43,6 +45,7 @@
 unsigned char far *VGA = (unsigned char far *)MK_FP(0xA000, 0);
 volatile unsigned char keys[128];
 void interrupt (*old_key_handler)();
+int mouse_available = 0;
 unsigned char wall_textures[NUM_TEXTURES][TEX_SIZE];
 
 double posX = 3.5;
@@ -78,6 +81,9 @@ void wait_retrace(void);
 void install_keyboard(void);
 void remove_keyboard(void);
 void interrupt keyboard_handler(void);
+void init_mouse(void);
+void remove_mouse(void);
+void update_mouse(void);
 int is_wall(int x, int y);
 int texture_index(char tile);
 void init_textures(void);
@@ -180,6 +186,74 @@ void install_keyboard(void)
 void remove_keyboard(void)
 {
     setvect(9, old_key_handler);
+}
+
+void init_mouse(void)
+{
+    union REGS regs;
+    void interrupt (*mouse_handler)();
+
+    mouse_available = 0;
+    mouse_handler = getvect(0x33);
+    if ((FP_SEG(mouse_handler) == 0 && FP_OFF(mouse_handler) == 0) ||
+        *(unsigned char far *)mouse_handler == 0xCF) {
+        return;
+    }
+
+    /* Reset the driver, which also hides its cursor. */
+    regs.x.ax = 0;
+    int86(0x33, &regs, &regs);
+    mouse_available = (regs.x.ax == 0xFFFF);
+    if (mouse_available) {
+        /* Discard motion accumulated before gameplay starts. */
+        regs.x.ax = 0x0B;
+        int86(0x33, &regs, &regs);
+    }
+}
+
+void remove_mouse(void)
+{
+    union REGS regs;
+
+    if (mouse_available) {
+        regs.x.ax = 0;
+        int86(0x33, &regs, &regs);
+        mouse_available = 0;
+    }
+}
+
+void update_mouse(void)
+{
+    union REGS regs;
+    int dx;
+    int dy;
+    double distance;
+    double step;
+
+    if (!mouse_available) {
+        return;
+    }
+
+    /* Relative, signed mickeys allow movement beyond screen edges. */
+    regs.x.ax = 0x0B;
+    int86(0x33, &regs, &regs);
+    dx = (int)regs.x.cx;
+    dy = (int)regs.x.dx;
+
+    if (dx != 0) {
+        rotate_player(dx * MOUSE_TURN_SENSITIVITY);
+    }
+
+    /* Pushing the mouse forward produces a negative Y delta. */
+    distance = -(double)dy * MOUSE_MOVE_SENSITIVITY;
+    while (fabs(distance) > MOVE_SPEED) {
+        step = distance > 0.0 ? MOVE_SPEED : -MOVE_SPEED;
+        try_move(dirX * step, dirY * step);
+        distance -= step;
+    }
+    if (distance != 0.0) {
+        try_move(dirX * distance, dirY * distance);
+    }
 }
 
 int is_wall(int x, int y)
@@ -360,6 +434,8 @@ void try_move(double dx, double dy)
 
 void update_player(void)
 {
+    update_mouse();
+
     if (keys[SC_W] || keys[SC_UP]) {
         try_move(dirX * MOVE_SPEED, dirY * MOVE_SPEED);
     }
@@ -512,6 +588,8 @@ int main(void)
     cprintf("W/S : move forward/back\r\n");
     cprintf("A/D : strafe left/right\r\n");
     cprintf("Up/Down/Left/Right : move forward/back turn left/right\r\n");
+    cprintf("Mouse left/right : turn\r\n");
+    cprintf("Mouse forward/back : move forward/back\r\n");
     cprintf("ESC : quit\r\n\r\n");
     cprintf("Press any key to start...");
     getch();
@@ -520,6 +598,7 @@ int main(void)
     set_video_mode(0x13);
     init_palette();
     init_textures();
+    init_mouse();
 
     while (!keys[SC_ESC]) {
         update_player();
@@ -528,6 +607,7 @@ int main(void)
     }
 
     set_video_mode(0x03);
+    remove_mouse();
     remove_keyboard();
 
     cprintf("Thanks for playing!\r\n");
