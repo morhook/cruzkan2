@@ -1,4 +1,5 @@
 #include <dos.h>
+#include <bios.h>
 #include <conio.h>
 #include <math.h>
 
@@ -33,10 +34,21 @@
 #define SC_RIGHT 77
 #define SC_UP 72
 #define SC_DOWN 80
+#define SC_SPACE 57
+
+#define GUN_W 32
+#define GUN_H 32
+#define FLASH_W 16
+#define FLASH_H 12
+#define WEAPON_SCALE 2
+#define SHOT_TICKS 5
+#define FLASH_TICKS 2
+#define BIOS_TICKS_PER_DAY 0x1800B0UL
 
 #define COL_SKY 20
 #define COL_FLOOR 21
 #define COL_TEXTURE_BASE 22
+#define COL_WEAPON_BASE 46
 
 #define SHADE_DARK 0
 #define SHADE_BASE 1
@@ -46,7 +58,61 @@ unsigned char far *VGA = (unsigned char far *)MK_FP(0xA000, 0);
 volatile unsigned char keys[128];
 void interrupt (*old_key_handler)();
 int mouse_available = 0;
+int mouse_fire = 0;
+unsigned int shot_ticks = 0;
+unsigned long weapon_last_tick = 0;
 unsigned char wall_textures[NUM_TEXTURES][TEX_SIZE];
+
+/* Transparent dots; 1-7 are gun/hand shades, 8-A are flash shades. */
+char gun_sprite[GUN_H][GUN_W + 1] = {
+    "..............1111..............",
+    "..............1551..............",
+    "............11232111............",
+    "...........12344443211..........",
+    "...........13455554321..........",
+    "...........13411114321..........",
+    "...........13412214321..........",
+    "...........13411114321..........",
+    "...........12344443211..........",
+    "..........1234555543211.........",
+    "..........1345555554321.........",
+    "..........1344444444321.........",
+    ".........123444444443211........",
+    ".........134555555554321........",
+    ".........134444444444321........",
+    ".........132333333332321........",
+    ".........132444444442321........",
+    ".........132333333332321........",
+    ".........112222222222111........",
+    "..........122222222221..........",
+    "..........166666666661..........",
+    ".........16777777777661.........",
+    "........1677777777776611........",
+    ".......167777777777766621.......",
+    ".......167777766666666621.......",
+    ".......167777777777766621.......",
+    ".......167777766666666621.......",
+    "........1677777777776621........",
+    "........166777777776661.........",
+    ".......16667777777766661........",
+    "......1666777777777766661.......",
+    ".....166677777777777766661......"
+};
+
+char flash_sprite[FLASH_H][FLASH_W + 1] = {
+    ".......88.......",
+    "...8...998...8..",
+    "...98.8998.89...",
+    "....989AA989....",
+    ".88999AAAA99988.",
+    "..89AAAAAAAA98..",
+    "...89AAAAAA98...",
+    ".88999AAAA99988.",
+    "....989AA989....",
+    "...98.8998.89...",
+    "...8...998...8..",
+    ".......88......."
+};
 
 double posX = 3.5;
 double posY = 3.5;
@@ -92,6 +158,10 @@ void draw_column(int x, int draw_start, int draw_end, int line_height,
 void rotate_player(double angle);
 void try_move(double dx, double dy);
 void update_player(void);
+void update_weapon(void);
+void draw_weapon_sprite(const char *sprite, int width, int height,
+                        int x, int y, int column_x);
+void draw_weapon_column(int column_x);
 void render_frame(void);
 
 void set_video_mode(unsigned char mode)
@@ -142,6 +212,17 @@ void init_palette(void)
     set_palette(43, 12, 7, 2);
     set_palette(44, 24, 18, 5);
     set_palette(45, 34, 26, 9);
+
+    set_palette(COL_WEAPON_BASE, 5, 5, 7);
+    set_palette(COL_WEAPON_BASE + 1, 12, 13, 16);
+    set_palette(COL_WEAPON_BASE + 2, 23, 25, 29);
+    set_palette(COL_WEAPON_BASE + 3, 37, 40, 44);
+    set_palette(COL_WEAPON_BASE + 4, 53, 56, 59);
+    set_palette(COL_WEAPON_BASE + 5, 28, 14, 8);
+    set_palette(COL_WEAPON_BASE + 6, 47, 29, 17);
+    set_palette(COL_WEAPON_BASE + 7, 63, 23, 2);
+    set_palette(COL_WEAPON_BASE + 8, 63, 51, 8);
+    set_palette(COL_WEAPON_BASE + 9, 63, 63, 48);
 }
 
 void wait_retrace(void)
@@ -194,6 +275,7 @@ void init_mouse(void)
     void interrupt (*mouse_handler)();
 
     mouse_available = 0;
+    mouse_fire = 0;
     mouse_handler = getvect(0x33);
     if ((FP_SEG(mouse_handler) == 0 && FP_OFF(mouse_handler) == 0) ||
         *(unsigned char far *)mouse_handler == 0xCF) {
@@ -233,6 +315,10 @@ void update_mouse(void)
     if (!mouse_available) {
         return;
     }
+
+    regs.x.ax = 3;
+    int86(0x33, &regs, &regs);
+    mouse_fire = (regs.x.bx & 1) != 0;
 
     /* Relative, signed mickeys allow movement beyond screen edges. */
     regs.x.ax = 0x0B;
@@ -456,6 +542,101 @@ void update_player(void)
     }
 }
 
+void update_weapon(void)
+{
+    unsigned long now;
+    unsigned long elapsed;
+
+    /* BIOS ticks keep firing speed independent of rendering speed. */
+    now = (unsigned long)biostime(0, 0L);
+    if (now >= weapon_last_tick) {
+        elapsed = now - weapon_last_tick;
+    } else {
+        elapsed = BIOS_TICKS_PER_DAY - weapon_last_tick + now;
+    }
+    weapon_last_tick = now;
+
+    if (elapsed >= shot_ticks) {
+        shot_ticks = 0;
+    } else {
+        shot_ticks -= (unsigned int)elapsed;
+    }
+    if (shot_ticks == 0 && (keys[SC_SPACE] || mouse_fire)) {
+        shot_ticks = SHOT_TICKS;
+    }
+}
+
+void draw_weapon_sprite(const char *sprite, int width, int height,
+                        int x, int y, int column_x)
+{
+    int sx;
+    int sy;
+    int first_sx;
+    int last_sx;
+    int px;
+    int py;
+    int dx;
+    int dy;
+    char pixel;
+    unsigned char color;
+    unsigned int offset;
+
+    if (column_x + COLUMN_W <= x || column_x >= x + width * WEAPON_SCALE) {
+        return;
+    }
+    first_sx = column_x > x ? (column_x - x) / WEAPON_SCALE : 0;
+    last_sx = (column_x + COLUMN_W - 1 - x) / WEAPON_SCALE;
+    if (last_sx >= width) {
+        last_sx = width - 1;
+    }
+    for (sy = 0; sy < height; ++sy) {
+        for (sx = first_sx; sx <= last_sx; ++sx) {
+            pixel = sprite[sy * (width + 1) + sx];
+            if (pixel == '.' || pixel == '\0') {
+                continue;
+            }
+            color = (unsigned char)(COL_WEAPON_BASE +
+                                    (pixel == 'A' ? 9 : pixel - '1'));
+            for (dy = 0; dy < WEAPON_SCALE; ++dy) {
+                py = y + sy * WEAPON_SCALE + dy;
+                if (py < 0 || py >= SCREEN_H) {
+                    continue;
+                }
+                for (dx = 0; dx < WEAPON_SCALE; ++dx) {
+                    px = x + sx * WEAPON_SCALE + dx;
+                    if (px >= column_x && px < column_x + COLUMN_W &&
+                        px >= 0 && px < SCREEN_W) {
+                        offset = (unsigned int)py * SCREEN_W + px;
+                        VGA[offset] = color;
+                    }
+                }
+            }
+        }
+    }
+}
+
+void draw_weapon_column(int column_x)
+{
+    int recoil;
+    int gun_y;
+
+    recoil = 0;
+    if (shot_ticks > SHOT_TICKS - FLASH_TICKS) {
+        recoil = 4;
+    } else if (shot_ticks > 1) {
+        recoil = 2;
+    }
+    gun_y = SCREEN_H - GUN_H * WEAPON_SCALE + recoil;
+
+    if (shot_ticks > SHOT_TICKS - FLASH_TICKS) {
+        draw_weapon_sprite(&flash_sprite[0][0], FLASH_W, FLASH_H,
+                           (SCREEN_W - FLASH_W * WEAPON_SCALE) / 2,
+                           gun_y - FLASH_H * WEAPON_SCALE + 6, column_x);
+    }
+    draw_weapon_sprite(&gun_sprite[0][0], GUN_W, GUN_H,
+                       (SCREEN_W - GUN_W * WEAPON_SCALE) / 2, gun_y, column_x);
+}
+
 void render_frame(void)
 {
     int col;
@@ -577,6 +758,8 @@ void render_frame(void)
 
         draw_column(screenX, drawStart, drawEnd, lineHeight,
                     tile, side, texX);
+        /* Overlay immediately so later maze columns cannot erase the gun. */
+        draw_weapon_column(screenX);
     }
 }
 
@@ -590,6 +773,7 @@ int main(void)
     cprintf("Up/Down/Left/Right : move forward/back turn left/right\r\n");
     cprintf("Mouse left/right : turn\r\n");
     cprintf("Mouse forward/back : move forward/back\r\n");
+    cprintf("Space / left mouse button : fire\r\n");
     cprintf("ESC : quit\r\n\r\n");
     cprintf("Press any key to start...");
     getch();
@@ -599,9 +783,11 @@ int main(void)
     init_palette();
     init_textures();
     init_mouse();
+    weapon_last_tick = (unsigned long)biostime(0, 0L);
 
     while (!keys[SC_ESC]) {
         update_player();
+        update_weapon();
         render_frame();
         wait_retrace();
     }

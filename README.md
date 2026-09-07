@@ -14,6 +14,8 @@ This is the first step toward a 3D sequel of [cruzkanoid](https://github.com/mor
 - Strafing
 - Interrupt-driven keyboard handler for smooth real-time controls
 - Relative mouse turning and forward/backward movement
+- Pixel-art pistol with muzzle flash and recoil animation
+- Timer-based firing cooldown, with repeat fire while holding the trigger
 
 ## Controls
 - W/Up: Move forward
@@ -24,7 +26,11 @@ This is the first step toward a 3D sequel of [cruzkanoid](https://github.com/mor
 - Right: Turn right
 - Mouse left/right: Turn left/right
 - Push mouse forward / pull backward: Move forward/backward
+- Space / left mouse button: Fire
 - Esc: Quit game
+
+The pistol currently fires with visual effects and unlimited ammo; the maze
+does not yet contain enemies or destructible targets.
 
 ## Running on your machine
 
