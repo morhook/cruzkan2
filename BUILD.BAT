@@ -2,4 +2,4 @@
 
 call addpath
 
-tcc -ml -Ic:\tc\include -Lc:\tc\lib CRUZKAN2.C
+tcc -ml -Ic:\tc\include -Lc:\tc\lib CRUZKAN2.C AUDIO.C

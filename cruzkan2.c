@@ -2,6 +2,7 @@
 #include <bios.h>
 #include <conio.h>
 #include <math.h>
+#include "audio.h"
 
 #define SCREEN_W 320
 #define SCREEN_H 200
@@ -563,6 +564,7 @@ void update_weapon(void)
     }
     if (shot_ticks == 0 && (keys[SC_SPACE] || mouse_fire)) {
         shot_ticks = SHOT_TICKS;
+        play_gunshot();
     }
 }
 
@@ -778,6 +780,7 @@ int main(void)
     cprintf("Press any key to start...");
     getch();
 
+    init_audio();
     install_keyboard();
     set_video_mode(0x13);
     init_palette();
@@ -792,6 +795,7 @@ int main(void)
         wait_retrace();
     }
 
+    shutdown_audio();
     set_video_mode(0x03);
     remove_mouse();
     remove_keyboard();

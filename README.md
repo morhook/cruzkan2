@@ -16,6 +16,7 @@ This is the first step toward a 3D sequel of [cruzkanoid](https://github.com/mor
 - Relative mouse turning and forward/backward movement
 - Pixel-art pistol with muzzle flash and recoil animation
 - Timer-based firing cooldown, with repeat fire while holding the trigger
+- Sampled pistol gunshot with nonblocking Sound Blaster playback
 
 ## Controls
 - W/Up: Move forward
@@ -29,7 +30,7 @@ This is the first step toward a 3D sequel of [cruzkanoid](https://github.com/mor
 - Space / left mouse button: Fire
 - Esc: Quit game
 
-The pistol currently fires with visual effects and unlimited ammo; the maze
+The pistol currently fires with visual and sound effects and unlimited ammo; the maze
 does not yet contain enemies or destructible targets.
 
 ## Running on your machine
@@ -48,14 +49,34 @@ Mouse turning and movement sensitivity can be adjusted separately using
 `MOUSE_TURN_SENSITIVITY` and `MOUSE_MOVE_SENSITIVITY` in `cruzkan2.c`.
 
 ## Building in Turbo C
-1. Open Turbo C.
-2. Create a new project or open `cruzkan2.c` directly.
-3. Compile and run.
+Run `BUILD.BAT` with Turbo C installed at `C:\TC`. In the IDE, create a
+project containing both `cruzkan2.c` and `audio.c`, then compile and run.
 
 Typical Turbo C settings:
-- Memory model: **Small** is fine.
+- Memory model: **Large** (the build script uses `-ml`).
 - Graphics library is **not required**.
 - Math library is linked automatically by Turbo C.
+
+## Sound
+
+Gunshots use a Sound Blaster-compatible card with 8-bit DMA. The game reads
+the `A` (hex base port), `I` (IRQ), and `D` (8-bit DMA channel) values from
+`BLASTER`. DOSBox normally sets this automatically. On real DOS, configure
+the card first and use its actual settings, for example:
+
+```dos
+SET BLASTER=A220 I7 D1 T6
+```
+
+Supported IRQs are 5, 7, 9 (also written as 2), and 10; DMA channels are
+0, 1, and 3. Missing/invalid settings or an undetected card disable audio
+without preventing gameplay. Incorrect settings for an installed card
+must be corrected to match the hardware; the game cannot verify IRQ/DMA wiring.
+
+The approximately 200 ms pistol sample is embedded in the executable;
+no WAV file or extra sound driver is needed at runtime. Playback starts
+once per accepted shot and does not wait for the sample to finish.
+See [SOUND.md](SOUND.md) for the recording credit and conversion instructions.
 
 ## Technical Details
 - Uses VGA Mode 13h (320x200, 256 colors)
