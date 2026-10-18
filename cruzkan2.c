@@ -767,19 +767,6 @@ void render_frame(void)
 
 int main(void)
 {
-    clrscr();
-    cprintf("Cruzkan2 demo for Turbo C\r\n");
-    cprintf("--------------------------------\r\n\r\n");
-    cprintf("W/S : move forward/back\r\n");
-    cprintf("A/D : strafe left/right\r\n");
-    cprintf("Up/Down/Left/Right : move forward/back turn left/right\r\n");
-    cprintf("Mouse left/right : turn\r\n");
-    cprintf("Mouse forward/back : move forward/back\r\n");
-    cprintf("Space / left mouse button : fire\r\n");
-    cprintf("ESC : quit\r\n\r\n");
-    cprintf("Press any key to start...");
-    getch();
-
     init_audio();
     install_keyboard();
     set_video_mode(0x13);
