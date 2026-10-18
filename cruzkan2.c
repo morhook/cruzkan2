@@ -35,7 +35,7 @@
 #define SC_RIGHT 77
 #define SC_UP 72
 #define SC_DOWN 80
-#define SC_SPACE 57
+#define SC_CTRL 29
 
 #define GUN_W 32
 #define GUN_H 32
@@ -562,7 +562,7 @@ void update_weapon(void)
     } else {
         shot_ticks -= (unsigned int)elapsed;
     }
-    if (shot_ticks == 0 && (keys[SC_SPACE] || mouse_fire)) {
+    if (shot_ticks == 0 && (keys[SC_CTRL] || mouse_fire)) {
         shot_ticks = SHOT_TICKS;
         play_gunshot();
     }

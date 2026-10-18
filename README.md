@@ -27,7 +27,7 @@ This is the first step toward a 3D sequel of [cruzkanoid](https://github.com/mor
 - Right: Turn right
 - Mouse left/right: Turn left/right
 - Push mouse forward / pull backward: Move forward/backward
-- Space / left mouse button: Fire
+- Ctrl / left mouse button: Fire
 - Esc: Quit game
 
 The pistol currently fires with visual and sound effects and unlimited ammo; the maze
