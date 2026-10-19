@@ -12,7 +12,7 @@
 #define TEX_W 32
 #define TEX_H 32
 #define TEX_SIZE (TEX_W * TEX_H)
-#define NUM_TEXTURES 4
+#define NUM_TEXTURES 5
 
 #define MAP_W 16
 #define MAP_H 16
@@ -49,7 +49,7 @@
 #define COL_SKY 20
 #define COL_FLOOR 21
 #define COL_TEXTURE_BASE 22
-#define COL_WEAPON_BASE 46
+#define COL_WEAPON_BASE 52
 
 #define SHADE_DARK 0
 #define SHADE_BASE 1
@@ -126,7 +126,7 @@ char world[MAP_H][MAP_W + 1] = {
     "1111111111111111",
     "1000000000000001",
     "1022220000333301",
-    "1000020000000301",
+    "1000050000000301",
     "1000020011110301",
     "1000000010000001",
     "1004440010000001",
@@ -213,6 +213,14 @@ void init_palette(void)
     set_palette(43, 12, 7, 2);
     set_palette(44, 24, 18, 5);
     set_palette(45, 34, 26, 9);
+
+    /* Target backing, white rings and red rings, then side shading. */
+    set_palette(46, 22, 22, 24);
+    set_palette(47, 63, 63, 63);
+    set_palette(48, 55, 5, 5);
+    set_palette(49, 12, 12, 14);
+    set_palette(50, 38, 38, 38);
+    set_palette(51, 32, 3, 3);
 
     set_palette(COL_WEAPON_BASE, 5, 5, 7);
     set_palette(COL_WEAPON_BASE + 1, 12, 13, 16);
@@ -362,6 +370,8 @@ int texture_index(char tile)
             return 2;
         case '4':
             return 3;
+        case '5':
+            return 4;
     }
     return 1;
 }
@@ -374,6 +384,7 @@ void init_textures(void)
     int local_x;
     int local_y;
     int shade;
+    int radius_sq;
 
     for (y = 0; y < TEX_H; ++y) {
         for (x = 0; x < TEX_W; ++x) {
@@ -425,6 +436,23 @@ void init_textures(void)
                 shade = SHADE_BASE;
             }
             wall_textures[3][offset] = (unsigned char)shade;
+
+            /* Doubled coordinates center the rings between texels. */
+            local_x = x * 2 - (TEX_W - 1);
+            local_y = y * 2 - (TEX_H - 1);
+            radius_sq = local_x * local_x + local_y * local_y;
+            if (radius_sq <= 36) {
+                shade = SHADE_LIGHT;
+            } else if (radius_sq <= 144) {
+                shade = SHADE_BASE;
+            } else if (radius_sq <= 324) {
+                shade = SHADE_LIGHT;
+            } else if (radius_sq <= 576) {
+                shade = SHADE_BASE;
+            } else {
+                shade = SHADE_DARK;
+            }
+            wall_textures[4][offset] = (unsigned char)shade;
         }
     }
 }
