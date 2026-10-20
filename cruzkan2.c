@@ -845,7 +845,7 @@ int main(void)
     init_mouse();
     weapon_last_tick = (unsigned long)biostime(0, 0L);
 
-    while (!keys[SC_ESC]) {
+    while (!keys[SC_ESC] && freeze_remaining != 0) {
         if (screen_frozen) {
             fill_frozen_screen();
         } else {
@@ -861,6 +861,10 @@ int main(void)
     remove_mouse();
     remove_keyboard();
 
-    cprintf("Thanks for playing!\r\n");
+    if (freeze_remaining == 0) {
+        cprintf("Congratulations! You hit the bullseye!\r\n");
+    } else {
+        cprintf("Thanks for playing!\r\n");
+    }
     return 0;
 }
