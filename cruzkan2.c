@@ -50,6 +50,8 @@
 #define COL_FLOOR 21
 #define COL_TEXTURE_BASE 22
 #define COL_WEAPON_BASE 52
+#define COL_FREEZE_GREY 62
+#define FREEZE_PIXELS_PER_FRAME 512
 
 #define SHADE_DARK 0
 #define SHADE_BASE 1
@@ -61,6 +63,10 @@ void interrupt (*old_key_handler)();
 int mouse_available = 0;
 int mouse_fire = 0;
 unsigned int shot_ticks = 0;
+int shot_fired = 0;
+int screen_frozen = 0;
+unsigned int freeze_random = 0;
+unsigned int freeze_remaining = 64000U;
 unsigned long weapon_last_tick = 0;
 unsigned char wall_textures[NUM_TEXTURES][TEX_SIZE];
 
@@ -164,6 +170,7 @@ void draw_weapon_sprite(const char *sprite, int width, int height,
                         int x, int y, int column_x);
 void draw_weapon_column(int column_x);
 void render_frame(void);
+void fill_frozen_screen(void);
 
 void set_video_mode(unsigned char mode)
 {
@@ -185,6 +192,7 @@ void init_palette(void)
 {
     set_palette(COL_SKY, 10, 18, 30);
     set_palette(COL_FLOOR, 12, 10, 10);
+    set_palette(COL_FREEZE_GREY, 32, 32, 32);
 
     set_palette(22, 20, 3, 3);
     set_palette(23, 40, 8, 8);
@@ -576,6 +584,7 @@ void update_weapon(void)
     unsigned long now;
     unsigned long elapsed;
 
+    shot_fired = 0;
     /* BIOS ticks keep firing speed independent of rendering speed. */
     now = (unsigned long)biostime(0, 0L);
     if (now >= weapon_last_tick) {
@@ -593,6 +602,7 @@ void update_weapon(void)
     if (shot_ticks == 0 && (keys[SC_CTRL] || mouse_fire)) {
         shot_ticks = SHOT_TICKS;
         play_gunshot();
+        shot_fired = 1;
     }
 }
 
@@ -691,6 +701,9 @@ void render_frame(void)
         int drawStart;
         int drawEnd;
         int texX;
+        int aimTexY;
+        int aimX;
+        int aimY;
         char tile;
         int screenX;
 
@@ -786,10 +799,39 @@ void render_frame(void)
         tile = world[mapY][mapX];
         screenX = col * COLUMN_W;
 
+        /* The middle ray is the gun's aim; only the innermost disk wins.
+           Match the texture sampling used by draw_column at screen center. */
+        if (shot_fired && col == NUM_RAYS / 2 && tile == '5') {
+            aimTexY = (int)(((long)(HALF_H - drawStart) *
+                       (((long)TEX_H << 16) / lineHeight)) >> 16);
+            aimX = texX * 2 - (TEX_W - 1);
+            aimY = aimTexY * 2 - (TEX_H - 1);
+            if (aimX * aimX + aimY * aimY <= 36) {
+                screen_frozen = 1;
+                freeze_random = (unsigned int)biostime(0, 0L);
+            }
+        }
+
         draw_column(screenX, drawStart, drawEnd, lineHeight,
                     tile, side, texX);
         /* Overlay immediately so later maze columns cannot erase the gun. */
         draw_weapon_column(screenX);
+    }
+}
+
+void fill_frozen_screen(void)
+{
+    int count;
+
+    /* A full-period 16-bit permutation visits every VGA pixel once.
+       Skip the unused tail of the segment: no bitmap or retry slowdown. */
+    for (count = 0; count < FREEZE_PIXELS_PER_FRAME &&
+                    freeze_remaining != 0; ++count) {
+        do {
+            freeze_random = (unsigned int)(freeze_random * 25173UL + 13849UL);
+        } while (freeze_random >= 64000U);
+        VGA[freeze_random] = COL_FREEZE_GREY;
+        --freeze_remaining;
     }
 }
 
@@ -804,9 +846,13 @@ int main(void)
     weapon_last_tick = (unsigned long)biostime(0, 0L);
 
     while (!keys[SC_ESC]) {
-        update_player();
-        update_weapon();
-        render_frame();
+        if (screen_frozen) {
+            fill_frozen_screen();
+        } else {
+            update_player();
+            update_weapon();
+            render_frame();
+        }
         wait_retrace();
     }
 
