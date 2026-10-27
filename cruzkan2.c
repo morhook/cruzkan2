@@ -45,6 +45,8 @@
 #define SHOT_TICKS 5
 #define FLASH_TICKS 2
 #define BIOS_TICKS_PER_DAY 0x1800B0UL
+#define BULLSEYE_SAMPLE_RATE 11025UL
+#define BULLSEYE_SAMPLE_LENGTH 4096
 
 #define COL_SKY 20
 #define COL_FLOOR 21
@@ -69,6 +71,7 @@ unsigned int freeze_random = 0;
 unsigned int freeze_remaining = 64000U;
 unsigned long weapon_last_tick = 0;
 unsigned char wall_textures[NUM_TEXTURES][TEX_SIZE];
+static unsigned char far bullseye_sample[BULLSEYE_SAMPLE_LENGTH];
 
 /* Transparent dots; 1-7 are gun/hand shades, 8-A are flash shades. */
 char gun_sprite[GUN_H][GUN_W + 1] = {
@@ -171,6 +174,8 @@ void draw_weapon_sprite(const char *sprite, int width, int height,
 void draw_weapon_column(int column_x);
 void render_frame(void);
 void fill_frozen_screen(void);
+void init_bullseye_sound(void);
+void play_bullseye(void);
 
 void set_video_mode(unsigned char mode)
 {
@@ -178,6 +183,38 @@ void set_video_mode(unsigned char mode)
     regs.h.ah = 0x00;
     regs.h.al = mode;
     int86(0x10, &regs, &regs);
+}
+
+void init_bullseye_sound(void)
+{
+    unsigned int i;
+    double time;
+    double tone;
+    double sample_value;
+
+    for (i = 0; i < BULLSEYE_SAMPLE_LENGTH; ++i) {
+        time = (double)i / (double)BULLSEYE_SAMPLE_RATE;
+        tone = 0.62 * sin(2.0 * 3.141592653589793 * 330.0 * time) *
+                   exp(-time / 0.42) +
+               0.28 * sin(2.0 * 3.141592653589793 * 495.0 * time) *
+                   exp(-time / 0.30) +
+               0.22 * sin(2.0 * 3.141592653589793 * 660.0 * time) *
+                   exp(-time / 0.23) +
+               0.12 * sin(2.0 * 3.141592653589793 * 832.0 * time) *
+                   exp(-time / 0.16);
+        sample_value = 128.0 + tone * 90.0;
+        if (sample_value > 255.0) {
+            sample_value = 255.0;
+        } else if (sample_value < 0.0) {
+            sample_value = 0.0;
+        }
+        bullseye_sample[i] = (unsigned char)sample_value;
+    }
+}
+
+void play_bullseye(void)
+{
+    (void)audio_play_sample(bullseye_sample, BULLSEYE_SAMPLE_LENGTH, 220);
 }
 
 void set_palette(unsigned char index, unsigned char r, unsigned char g, unsigned char b)
@@ -807,6 +844,7 @@ void render_frame(void)
             aimX = texX * 2 - (TEX_W - 1);
             aimY = aimTexY * 2 - (TEX_H - 1);
             if (aimX * aimX + aimY * aimY <= 36) {
+                play_bullseye();
                 screen_frozen = 1;
                 freeze_random = (unsigned int)biostime(0, 0L);
             }
@@ -838,6 +876,7 @@ void fill_frozen_screen(void)
 int main(void)
 {
     init_audio();
+    init_bullseye_sound();
     install_keyboard();
     set_video_mode(0x13);
     init_palette();

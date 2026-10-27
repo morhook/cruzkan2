@@ -16,7 +16,8 @@ This is the first step toward a 3D sequel of [cruzkanoid](https://github.com/mor
 - Relative mouse turning and forward/backward movement
 - Pixel-art pistol with muzzle flash and recoil animation
 - Timer-based firing cooldown, with repeat fire while holding the trigger
-- Sampled pistol gunshot with nonblocking Sound Blaster playback
+- Four-voice software mixer for overlapping sampled sounds
+- Sampled pistol gunshot and bullseye-center bell sound with nonblocking playback
 
 ## Controls
 - W/Up: Move forward
@@ -75,7 +76,13 @@ must be corrected to match the hardware; the game cannot verify IRQ/DMA wiring.
 
 The approximately 200 ms pistol sample is embedded in the executable;
 no WAV file or extra sound driver is needed at runtime. Playback starts
-once per accepted shot and does not wait for the sample to finish.
+once per accepted shot and does not wait for the sample to finish. Up to
+four unsigned 8-bit mono samples at 11,025 Hz can play and mix concurrently.
+`audio_play_sample` in `audio.h` is the entry point for adding sounds to game
+events; samples must remain available until playback completes. A synthesized
+bell-like tone plays when a shot hits the bullseye's center, overlapping the
+gunshot so the mixer can be tested. The tone is generated at startup and needs
+no additional runtime file.
 See [SOUND.md](SOUND.md) for the recording credit and conversion instructions.
 
 ## Technical Details
