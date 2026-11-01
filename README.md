@@ -41,6 +41,9 @@ Run the game in a real DOS machine, DOSBox or DOSBox-X:
 cruzkan2.exe
 ```
 
+From the project directory, launch the included Pentium-class DOSBox setup with
+`dosbox -conf dosbox.conf`. It mounts the project as `C:` and starts the game.
+
 Mouse support is detected automatically. On real DOS, load a mouse driver
 (such as CuteMouse) before starting the game; DOSBox provides one internally.
 In DOSBox, click inside the window to capture the mouse and press Ctrl+F10 to
