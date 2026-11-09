@@ -219,10 +219,10 @@ void play_bullseye(void)
 
 void set_palette(unsigned char index, unsigned char r, unsigned char g, unsigned char b)
 {
-    outp(0x3C8, index);
-    outp(0x3C9, r);
-    outp(0x3C9, g);
-    outp(0x3C9, b);
+    outportb(0x3C8, index);
+    outportb(0x3C9, r);
+    outportb(0x3C9, g);
+    outportb(0x3C9, b);
 }
 
 void init_palette(void)
@@ -303,9 +303,9 @@ void interrupt keyboard_handler(void)
     }
 
     ack = inp(0x61);
-    outp(0x61, ack | 0x80);
-    outp(0x61, ack);
-    outp(0x20, 0x20);
+    outportb(0x61, ack | 0x80);
+    outportb(0x61, ack);
+    outportb(0x20, 0x20);
 }
 
 void install_keyboard(void)

@@ -53,7 +53,7 @@ Mouse turning and movement sensitivity can be adjusted separately using
 `MOUSE_TURN_SENSITIVITY` and `MOUSE_MOVE_SENSITIVITY` in `cruzkan2.c`.
 
 ## Building in Turbo C
-Run `BUILD.BAT` with Turbo C installed at `C:\TC`. In the IDE, create a
+Run `BUILD.BAT` with Turbo C++ 3.00 installed at `C:\TC`. In the IDE, create a
 project containing both `cruzkan2.c` and `audio.c`, then compile and run.
 
 Typical Turbo C settings:
