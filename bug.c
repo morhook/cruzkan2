@@ -14,6 +14,18 @@ static double bug_y = 3.5;
 static int bug_alive = 1;
 static int game_result = 0; /* 0 playing, 1 player defeated, 2 bug defeated */
 
+/* Sprite projection is computed once per frame, then each screen column is
+   composited as the renderer draws it. Drawing the sprite only after the
+   whole frame makes it visible for part of a frame and causes flicker. */
+static int bug_visible = 0;
+static int bug_first_column = 0;
+static int bug_last_column = 0;
+static double bug_left = 0.0;
+static double bug_top = 0.0;
+static double bug_sprite_width = 0.0;
+static double bug_sprite_height = 0.0;
+static double bug_depth = 0.0;
+
 static char bug_sprite[BUG_H][BUG_W + 1] = {
     "....11....11....",
     "...1221..1221...",
@@ -158,7 +170,7 @@ void shoot_bug_if_aimed(void)
     }
 }
 
-void draw_bug(void)
+void begin_bug_frame(void)
 {
     double sprite_x;
     double sprite_y;
@@ -166,28 +178,9 @@ void draw_bug(void)
     double transform_x;
     double transform_y;
     double screen_center;
-    double sprite_height;
-    double sprite_width;
-    double left;
-    double top;
-    int first_column;
-    int last_column;
-    int column;
-    int x;
-    int y;
-    int source_x;
-    int source_y;
-    int screen_x;
-    int screen_y;
-    int ray;
-    char pixel;
-    unsigned int offset;
-    double camera_x;
-    double ray_dir_x;
-    double ray_dir_y;
-    double wall_distance;
 
-    if (!bug_alive) {
+    bug_visible = 0;
+    if (!bug_alive || game_result != 0) {
         return;
     }
     sprite_x = bug_x - posX;
@@ -199,45 +192,54 @@ void draw_bug(void)
         return;
     }
     screen_center = (SCREEN_W / 2.0) * (1.0 + transform_x / transform_y);
-    sprite_height = fabs(SCREEN_H / transform_y) * 0.62;
-    sprite_width = sprite_height * BUG_W / BUG_H;
-    left = screen_center - sprite_width / 2.0;
-    top = HALF_H - sprite_height / 2.0;
-    first_column = (int)left;
-    last_column = (int)(left + sprite_width);
-    if (first_column < 0) first_column = 0;
-    if (last_column >= SCREEN_W) last_column = SCREEN_W - 1;
+    bug_sprite_height = fabs(SCREEN_H / transform_y) * 0.62;
+    bug_sprite_width = bug_sprite_height * BUG_W / BUG_H;
+    bug_left = screen_center - bug_sprite_width / 2.0;
+    bug_top = HALF_H - bug_sprite_height / 2.0;
+    bug_depth = transform_y;
+    bug_first_column = (int)bug_left;
+    bug_last_column = (int)(bug_left + bug_sprite_width);
+    if (bug_first_column < 0) bug_first_column = 0;
+    if (bug_last_column >= SCREEN_W) bug_last_column = SCREEN_W - 1;
+    bug_visible = 1;
+}
 
-    for (column = first_column; column <= last_column; ++column) {
-        ray = column / COLUMN_W;
-        camera_x = (2.0 * ray) / (double)NUM_RAYS - 1.0;
-        ray_dir_x = dirX + planeX * camera_x;
-        ray_dir_y = dirY + planeY * camera_x;
-        wall_distance = bug_wall_distance(ray_dir_x, ray_dir_y);
-        if (transform_y >= wall_distance) {
+void draw_bug_column(int column, double wall_distance)
+{
+    int x;
+    int y;
+    int source_x;
+    int source_y;
+    int screen_y;
+    char pixel;
+    unsigned int offset;
+
+    if (!bug_visible || column < bug_first_column ||
+        column > bug_last_column) {
+        return;
+    }
+    if (bug_depth >= wall_distance) {
+        return;
+    }
+    x = (int)(((column - bug_left) / bug_sprite_width) * BUG_W);
+    if (x < 0) x = 0;
+    if (x >= BUG_W) x = BUG_W - 1;
+    for (y = 0; y < (int)bug_sprite_height; ++y) {
+        screen_y = (int)bug_top + y;
+        if (screen_y < 0 || screen_y >= SCREEN_H) {
             continue;
         }
-        x = (int)(((column - left) / sprite_width) * BUG_W);
-        if (x < 0) x = 0;
-        if (x >= BUG_W) x = BUG_W - 1;
-        for (y = 0; y < (int)sprite_height; ++y) {
-            screen_y = (int)top + y;
-            if (screen_y < 0 || screen_y >= SCREEN_H) {
-                continue;
-            }
-            source_y = (int)((y / sprite_height) * BUG_H);
-            pixel = bug_sprite[source_y][x];
-            if (pixel == '.' || pixel == '\0') {
-                continue;
-            }
-            source_x = pixel - '1';
-            if (source_x < 0 || source_x > 5) {
-                continue;
-            }
-            screen_x = column;
-            offset = (unsigned int)screen_y * SCREEN_W + screen_x;
-            VGA[offset] = (unsigned char)(BUG_COLOR_BASE + source_x);
+        source_y = (int)((y / bug_sprite_height) * BUG_H);
+        pixel = bug_sprite[source_y][x];
+        if (pixel == '.' || pixel == '\0') {
+            continue;
         }
+        source_x = pixel - '1';
+        if (source_x < 0 || source_x > 5) {
+            continue;
+        }
+        offset = (unsigned int)screen_y * SCREEN_W + column;
+        VGA[offset] = (unsigned char)(BUG_COLOR_BASE + source_x);
     }
 }
 

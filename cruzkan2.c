@@ -714,6 +714,8 @@ void render_frame(void)
 {
     int col;
 
+    begin_bug_frame();
+
     for (col = 0; col < NUM_RAYS; ++col) {
         double cameraX;
         double rayDirX;
@@ -850,6 +852,9 @@ void render_frame(void)
                     tile, side, texX);
         /* Overlay immediately so later maze columns cannot erase the gun. */
         draw_weapon_column(screenX);
+        /* Composite the bug in the same pass so it persists like the walls. */
+        draw_bug_column(screenX, perpWallDist);
+        draw_bug_column(screenX + 1, perpWallDist);
     }
 }
 
@@ -888,11 +893,8 @@ int main(void)
             update_player();
             update_bug();
             update_weapon();
-            render_frame();
             shoot_bug_if_aimed();
-            if (bug_game_result() == 0) {
-                draw_bug();
-            }
+            render_frame();
         }
         wait_retrace();
     }
