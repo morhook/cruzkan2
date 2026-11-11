@@ -2,7 +2,7 @@
 
 A Wolfenstein-style raycasting demo written in C for DOS. **Now cruzkanoid goes to 3D!**
 
-This is the first step toward a 3D sequel of [cruzkanoid](https://github.com/morhook/cruzkanoid). It is not a full Wolfenstein 3D clone, but it renders a real-time first-person view of a maze using classic raycasting.
+This is the first step toward a 3D sequel of [cruzkanoid](https://github.com/morhook/cruzkanoid). It is not a full Wolfenstein 3D clone, but it renders a real-time first-person view of a maze using raycasting.
 
 ## Features
 - 320x200 VGA graphics (Mode 13h, 256 colors)
@@ -16,6 +16,7 @@ This is the first step toward a 3D sequel of [cruzkanoid](https://github.com/mor
 - Relative mouse turning and forward/backward movement
 - Pixel-art pistol with muzzle flash and recoil animation
 - Timer-based firing cooldown, with repeat fire while holding the trigger
+- A pursuing bug enemy that kills the player on contact and can be shot
 - Four-voice software mixer for overlapping sampled sounds
 - Sampled pistol gunshot and bullseye-center bell sound with nonblocking playback
 
@@ -31,8 +32,7 @@ This is the first step toward a 3D sequel of [cruzkanoid](https://github.com/mor
 - Ctrl / left mouse button: Fire
 - Esc: Quit game
 
-The pistol currently fires with visual and sound effects and unlimited ammo; the maze
-does not yet contain enemies or destructible targets.
+The bug pursues the player and kills on contact. Aim and fire to squash it; either the bug or the player dies, so keep your distance. The pistol otherwise has unlimited ammo. The maze also contains the existing bullseye target.
 
 ## Running on your machine
 
@@ -41,20 +41,14 @@ Run the game in a real DOS machine, DOSBox or DOSBox-X:
 cruzkan2.exe
 ```
 
-From the project directory, launch the included Pentium-class DOSBox setup with
-`dosbox -conf dosbox.conf`. It mounts the project as `C:` and starts the game.
+From the project directory, launch the included Pentium-class DOSBox setup with `dosbox -conf dosbox.conf`. It mounts the project as `C:` and starts the game.
 
-Mouse support is detected automatically. On real DOS, load a mouse driver
-(such as CuteMouse) before starting the game; DOSBox provides one internally.
-In DOSBox, click inside the window to capture the mouse and press Ctrl+F10 to
-release it. Keyboard controls also work without a mouse driver.
+Mouse support is detected automatically. On real DOS, load a mouse driver (such as CuteMouse) before starting the game; DOSBox provides one internally. In DOSBox, click inside the window to capture the mouse and press Ctrl+F10 to release it. Keyboard controls also work without a mouse driver.
 
-Mouse turning and movement sensitivity can be adjusted separately using
-`MOUSE_TURN_SENSITIVITY` and `MOUSE_MOVE_SENSITIVITY` in `cruzkan2.c`.
+Mouse turning and movement sensitivity can be adjusted separately using `MOUSE_TURN_SENSITIVITY` and `MOUSE_MOVE_SENSITIVITY` in `cruzkan2.c`.
 
 ## Building in Turbo C
-Run `BUILD.BAT` with Turbo C++ 3.00 installed at `C:\TC`. In the IDE, create a
-project containing both `cruzkan2.c` and `audio.c`, then compile and run.
+Run `BUILD.BAT` with Turbo C++ 3.00 installed at `C:\TC`. In the IDE, create a project containing `CRUZBUG.C` and `audio.c`, then compile and run.
 
 Typical Turbo C settings:
 - Memory model: **Large** (the build script uses `-ml`).
@@ -63,29 +57,15 @@ Typical Turbo C settings:
 
 ## Sound
 
-Gunshots use a Sound Blaster-compatible card with 8-bit DMA. The game reads
-the `A` (hex base port), `I` (IRQ), and `D` (8-bit DMA channel) values from
-`BLASTER`. DOSBox normally sets this automatically. On real DOS, configure
-the card first and use its actual settings, for example:
+Gunshots use a Sound Blaster-compatible card with 8-bit DMA. The game reads the `A` (hex base port), `I` (IRQ), and `D` (8-bit DMA channel) values from `BLASTER`. DOSBox normally sets this automatically. On real DOS, configure the card first and use its actual settings, for example:
 
 ```dos
 SET BLASTER=A220 I7 D1 T6
 ```
 
-Supported IRQs are 5, 7, 9 (also written as 2), and 10; DMA channels are
-0, 1, and 3. Missing/invalid settings or an undetected card disable audio
-without preventing gameplay. Incorrect settings for an installed card
-must be corrected to match the hardware; the game cannot verify IRQ/DMA wiring.
+Supported IRQs are 5, 7, 9 (also written as 2), and 10; DMA channels are 0, 1, and 3. Missing/invalid settings or an undetected card disable audio without preventing gameplay. Incorrect settings for an installed card must be corrected to match the hardware; the game cannot verify IRQ/DMA wiring.
 
-The approximately 200 ms pistol sample is embedded in the executable;
-no WAV file or extra sound driver is needed at runtime. Playback starts
-once per accepted shot and does not wait for the sample to finish. Up to
-four unsigned 8-bit mono samples at 11,025 Hz can play and mix concurrently.
-`audio_play_sample` in `audio.h` is the entry point for adding sounds to game
-events; samples must remain available until playback completes. A synthesized
-bell-like tone plays when a shot hits the bullseye's center, overlapping the
-gunshot so the mixer can be tested. The tone is generated at startup and needs
-no additional runtime file.
+The approximately 200 ms pistol sample is embedded in the executable; no WAV file or extra sound driver is needed at runtime. Playback starts once per accepted shot and does not wait for the sample to finish. Up to four unsigned 8-bit mono samples at 11,025 Hz can play and mix concurrently. `audio_play_sample` in `audio.h` is the entry point for adding sounds to game events; samples must remain available until playback completes. A synthesized bell-like tone plays when a shot hits the bullseye's center, overlapping the gunshot so the mixer can be tested. The tone is generated at startup and needs no additional runtime file.
 See [SOUND.md](SOUND.md) for the recording credit and conversion instructions.
 
 ## Technical Details
@@ -95,3 +75,4 @@ See [SOUND.md](SOUND.md) for the recording credit and conversion instructions.
 - Interrupt-driven keyboard handler for real-time input
 - DOS mouse driver (`INT 33h`) relative motion with collision-checked movement
 - Raycasting renderer casting 160 rays across 2-pixel-wide columns
+- Bug sprite is depth-tested against the raycast walls; shots only hit it when unobstructed
