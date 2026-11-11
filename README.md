@@ -18,7 +18,8 @@ This is the first step toward a 3D sequel of [cruzkanoid](https://github.com/mor
 - Timer-based firing cooldown, with repeat fire while holding the trigger
 - A pursuing bug enemy that kills the player on contact and can be shot
 - Four-voice software mixer for overlapping sampled sounds
-- Sampled pistol gunshot and bullseye-center bell sound with nonblocking playback
+- Sampled pistol gunshot and bullseye-center bell sound with nonblocking
+  playback, plus a synthesized screech that warns when the bug closes in
 
 ## Controls
 - W/Up: Move forward
@@ -32,7 +33,7 @@ This is the first step toward a 3D sequel of [cruzkanoid](https://github.com/mor
 - Ctrl / left mouse button: Fire
 - Esc: Quit game
 
-The bug pursues the player and kills on contact. Aim and fire to squash it; either the bug or the player dies, so keep your distance. The pistol otherwise has unlimited ammo. The maze also contains the existing bullseye target.
+The bug pursues the player and kills on contact. Aim and fire to squash it; either the bug or the player dies, so keep your distance. As it closes within three tiles it lets out a rising, rasping screech that gets louder the nearer it gets, so hearing it means it is hunting you. The pistol otherwise has unlimited ammo. The maze also contains the existing bullseye target.
 
 ## Running on your machine
 
@@ -65,7 +66,7 @@ SET BLASTER=A220 I7 D1 T6
 
 Supported IRQs are 5, 7, 9 (also written as 2), and 10; DMA channels are 0, 1, and 3. Missing/invalid settings or an undetected card disable audio without preventing gameplay. Incorrect settings for an installed card must be corrected to match the hardware; the game cannot verify IRQ/DMA wiring.
 
-The approximately 200 ms pistol sample is embedded in the executable; no WAV file or extra sound driver is needed at runtime. Playback starts once per accepted shot and does not wait for the sample to finish. Up to four unsigned 8-bit mono samples at 11,025 Hz can play and mix concurrently. `audio_play_sample` in `audio.h` is the entry point for adding sounds to game events; samples must remain available until playback completes. A synthesized bell-like tone plays when a shot hits the bullseye's center, overlapping the gunshot so the mixer can be tested. The tone is generated at startup and needs no additional runtime file.
+The approximately 200 ms pistol sample is embedded in the executable; no WAV file or extra sound driver is needed at runtime. Playback starts once per accepted shot and does not wait for the sample to finish. Up to four unsigned 8-bit mono samples at 11,025 Hz can play and mix concurrently. `audio_play_sample` in `audio.h` is the entry point for adding sounds to game events; samples must remain available until playback completes. A synthesized bell-like tone plays when a shot hits the bullseye's center, overlapping the gunshot so the mixer can be tested. The tone is generated at startup and needs no additional runtime file. The bug's scare sound is likewise synthesized in `bug.c` (a dissonant shriek with a climbing pitch, fast flutter, and noise); it is retriggered when the bug is within `BUG_SCARE_DISTANCE` tiles, fades in with proximity, and is spaced by `BUG_SCREECH_FRAMES` so it does not play every frame.
 See [SOUND.md](SOUND.md) for the recording credit and conversion instructions.
 
 ## Technical Details

@@ -878,6 +878,7 @@ int main(void)
 {
     init_audio();
     init_bullseye_sound();
+    init_bug_sound();
     install_keyboard();
     set_video_mode(0x13);
     init_palette();

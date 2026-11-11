@@ -1,4 +1,5 @@
 #include <math.h>
+#include "audio.h"
 #include "bug.h"
 #include "game.h"
 
@@ -9,10 +10,19 @@
 #define BUG_SHOT_RADIUS 0.28
 #define BUG_COLOR_BASE 63
 
+/* Scare sound: a dissonant, fluttering shriek that rises in pitch.
+   It plays while the bug closes in, so proximity is what makes it scary. */
+#define BUG_SCREECH_RATE 11025UL
+#define BUG_SCREECH_SAMPLES 6615
+#define BUG_SCARE_DISTANCE 3.0
+#define BUG_SCREECH_FRAMES 50
+
 static double bug_x = 11.5;
 static double bug_y = 3.5;
 static int bug_alive = 1;
 static int game_result = 0; /* 0 playing, 1 player defeated, 2 bug defeated */
+static unsigned int scare_wait = 0;
+static unsigned char far bug_screech[BUG_SCREECH_SAMPLES];
 
 /* Sprite projection is computed once per frame, then each screen column is
    composited as the renderer draws it. Drawing the sprite only after the
@@ -51,6 +61,62 @@ void init_bug_palette(void)
     set_palette(BUG_COLOR_BASE + 5, 63, 48, 12);
 }
 
+void init_bug_sound(void)
+{
+    unsigned int i;
+    unsigned int seed;
+    double time;
+    double progress;
+    double frequency;
+    double envelope;
+    double flutter;
+    double tone;
+    double noise;
+    double value;
+
+    /* No external asset: a fixed pseudo-random seed keeps the screech
+       identical on every run while still sounding rough. */
+    seed = 0x1D2Bu;
+    for (i = 0; i < BUG_SCREECH_SAMPLES; ++i) {
+        time = (double)i / (double)BUG_SCREECH_RATE;
+        progress = (double)i / (double)BUG_SCREECH_SAMPLES;
+        /* Climbing pitch reads as something charging at the player. */
+        frequency = 160.0 + 640.0 * progress * progress;
+        /* Fast flutter gives the tone an insect-like rasp. */
+        flutter = 0.58 + 0.42 * sin(2.0 * 3.141592653589793 * 26.0 * time);
+        tone = sin(2.0 * 3.141592653589793 * frequency * time) +
+               0.62 * sin(2.0 * 3.141592653589793 * frequency * 1.47 * time +
+                          1.1) +
+               0.40 * sin(2.0 * 3.141592653589793 * frequency * 2.09 * time +
+                          2.3) +
+               0.50 * sin(2.0 * 3.141592653589793 * frequency * 0.5 * time);
+        seed = (unsigned int)(seed * 25173UL + 13849UL);
+        noise = (double)(seed & 0xFFU) / 127.5 - 1.0;
+        envelope = (1.0 - exp(-time / 0.015)) * exp(-time / 0.34);
+        value = 128.0 + 2.6 * envelope * flutter *
+                        (tone * 33.0 + noise * 22.0);
+        if (value > 255.0) {
+            value = 255.0;
+        } else if (value < 0.0) {
+            value = 0.0;
+        }
+        bug_screech[i] = (unsigned char)value;
+    }
+}
+
+static void play_bug_screech(double distance)
+{
+    double closeness;
+    unsigned char volume;
+
+    closeness = 1.0 - distance / BUG_SCARE_DISTANCE;
+    if (closeness < 0.0) {
+        closeness = 0.0;
+    }
+    volume = (unsigned char)(85.0 + closeness * 170.0);
+    (void)audio_play_sample(bug_screech, BUG_SCREECH_SAMPLES, volume);
+}
+
 static void move_bug(double dx, double dy)
 {
     double next_x;
@@ -76,6 +142,9 @@ void update_bug(void)
     if (!bug_alive || game_result != 0) {
         return;
     }
+    if (scare_wait > 0) {
+        --scare_wait;
+    }
     dx = posX - bug_x;
     dy = posY - bug_y;
     distance = sqrt(dx * dx + dy * dy);
@@ -93,8 +162,14 @@ void update_bug(void)
     move_bug(dx * step, dy * step);
     dx = posX - bug_x;
     dy = posY - bug_y;
-    if (sqrt(dx * dx + dy * dy) <= BUG_CONTACT_DISTANCE) {
+    distance = sqrt(dx * dx + dy * dy);
+    if (distance <= BUG_CONTACT_DISTANCE) {
         game_result = 1;
+        return;
+    }
+    if (distance <= BUG_SCARE_DISTANCE && scare_wait == 0) {
+        scare_wait = BUG_SCREECH_FRAMES;
+        play_bug_screech(distance);
     }
 }
 

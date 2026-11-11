@@ -2,6 +2,8 @@
 #define CRUZ_BUG_H
 
 void init_bug_palette(void);
+/* Builds the scare sample; call once before gameplay starts. */
+void init_bug_sound(void);
 void update_bug(void);
 void shoot_bug_if_aimed(void);
 void begin_bug_frame(void);
