@@ -48,7 +48,7 @@ Mouse support is detected automatically. On real DOS, load a mouse driver (such 
 Mouse turning and movement sensitivity can be adjusted separately using `MOUSE_TURN_SENSITIVITY` and `MOUSE_MOVE_SENSITIVITY` in `cruzkan2.c`.
 
 ## Building in Turbo C
-Run `BUILD.BAT` with Turbo C++ 3.00 installed at `C:\TC`. In the IDE, create a project containing `CRUZBUG.C` and `audio.c`, then compile and run.
+Run `BUILD.BAT` with Turbo C++ 3.00 installed at `C:\TC`. In the IDE, create a project containing `cruzkan2.c`, `bug.c`, and `audio.c`, then compile and run.
 
 Typical Turbo C settings:
 - Memory model: **Large** (the build script uses `-ml`).

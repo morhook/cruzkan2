@@ -3,12 +3,9 @@
 #include <conio.h>
 #include <math.h>
 #include "audio.h"
+#include "bug.h"
+#include "game.h"
 
-#define SCREEN_W 320
-#define SCREEN_H 200
-#define HALF_H 100
-#define NUM_RAYS 160
-#define COLUMN_W 2
 #define TEX_W 32
 #define TEX_H 32
 #define TEX_SIZE (TEX_W * TEX_H)
@@ -22,7 +19,6 @@
 #define ROT_SPEED 0.08
 #define MOUSE_TURN_SENSITIVITY 0.003
 #define MOUSE_MOVE_SENSITIVITY 0.01
-#define RAY_EPSILON 0.000001
 
 #define SC_ESC 1
 #define SC_W 17
@@ -880,17 +876,23 @@ int main(void)
     install_keyboard();
     set_video_mode(0x13);
     init_palette();
+    init_bug_palette();
     init_textures();
     init_mouse();
     weapon_last_tick = (unsigned long)biostime(0, 0L);
 
-    while (!keys[SC_ESC] && freeze_remaining != 0) {
+    while (!keys[SC_ESC] && bug_game_result() == 0 && freeze_remaining != 0) {
         if (screen_frozen) {
             fill_frozen_screen();
         } else {
             update_player();
+            update_bug();
             update_weapon();
             render_frame();
+            shoot_bug_if_aimed();
+            if (bug_game_result() == 0) {
+                draw_bug();
+            }
         }
         wait_retrace();
     }
@@ -900,7 +902,11 @@ int main(void)
     remove_mouse();
     remove_keyboard();
 
-    if (freeze_remaining == 0) {
+    if (bug_game_result() == 1) {
+        cprintf("The bug got you! Better luck next time.\r\n");
+    } else if (bug_game_result() == 2) {
+        cprintf("You squashed the bug! You win!\r\n");
+    } else if (freeze_remaining == 0) {
         cprintf("Congratulations! You hit the bullseye!\r\n");
     } else {
         cprintf("Thanks for playing!\r\n");

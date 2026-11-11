@@ -1,10 +1,6 @@
-/*
- * Enemy-enabled game entry point. The original source is included so its
- * renderer, input handling, and game state remain shared with this module.
- */
-#define main original_main
-#include "cruzkan2.c"
-#undef main
+#include <math.h>
+#include "bug.h"
+#include "game.h"
 
 #define BUG_W 16
 #define BUG_H 12
@@ -33,7 +29,7 @@ static char bug_sprite[BUG_H][BUG_W + 1] = {
     "...22....22....."
 };
 
-static void init_bug_palette(void)
+void init_bug_palette(void)
 {
     set_palette(BUG_COLOR_BASE, 10, 24, 5);
     set_palette(BUG_COLOR_BASE + 1, 24, 42, 8);
@@ -58,7 +54,7 @@ static void move_bug(double dx, double dy)
     }
 }
 
-static void update_bug(void)
+void update_bug(void)
 {
     double dx;
     double dy;
@@ -137,7 +133,7 @@ static double bug_wall_distance(double ray_dir_x, double ray_dir_y)
     }
 }
 
-static void shoot_bug_if_aimed(void)
+void shoot_bug_if_aimed(void)
 {
     double dx;
     double dy;
@@ -162,7 +158,7 @@ static void shoot_bug_if_aimed(void)
     }
 }
 
-static void draw_bug(void)
+void draw_bug(void)
 {
     double sprite_x;
     double sprite_y;
@@ -245,47 +241,7 @@ static void draw_bug(void)
     }
 }
 
-int main(void)
+int bug_game_result(void)
 {
-    init_audio();
-    init_bullseye_sound();
-    install_keyboard();
-    set_video_mode(0x13);
-    init_palette();
-    init_bug_palette();
-    init_textures();
-    init_mouse();
-    weapon_last_tick = (unsigned long)biostime(0, 0L);
-
-    while (!keys[SC_ESC] && game_result == 0 && freeze_remaining != 0) {
-        if (screen_frozen) {
-            fill_frozen_screen();
-        } else {
-            update_player();
-            update_bug();
-            update_weapon();
-            render_frame();
-            shoot_bug_if_aimed();
-            if (game_result == 0) {
-                draw_bug();
-            }
-        }
-        wait_retrace();
-    }
-
-    shutdown_audio();
-    set_video_mode(0x03);
-    remove_mouse();
-    remove_keyboard();
-
-    if (game_result == 1) {
-        cprintf("The bug got you! Better luck next time.\r\n");
-    } else if (game_result == 2) {
-        cprintf("You squashed the bug! You win!\r\n");
-    } else if (freeze_remaining == 0) {
-        cprintf("Congratulations! You hit the bullseye!\r\n");
-    } else {
-        cprintf("Thanks for playing!\r\n");
-    }
-    return 0;
+    return game_result;
 }
