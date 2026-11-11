@@ -16,10 +16,11 @@ This is the first step toward a 3D sequel of [cruzkanoid](https://github.com/mor
 - Relative mouse turning and forward/backward movement
 - Pixel-art pistol with muzzle flash and recoil animation
 - Timer-based firing cooldown, with repeat fire while holding the trigger
-- A pursuing bug enemy that kills the player on contact and can be shot
+- A pursuing bug enemy that kills the player on contact and bursts into an animated fireball when shot
 - Four-voice software mixer for overlapping sampled sounds
 - Sampled pistol gunshot and bullseye-center bell sound with nonblocking
   playback, plus a synthesized screech that warns when the bug closes in
+  and a synthesized boom when it explodes
 
 ## Controls
 - W/Up: Move forward
@@ -33,7 +34,7 @@ This is the first step toward a 3D sequel of [cruzkanoid](https://github.com/mor
 - Ctrl / left mouse button: Fire
 - Esc: Quit game
 
-The bug pursues the player and kills on contact. Aim and fire to squash it; either the bug or the player dies, so keep your distance. As it closes within three tiles it lets out a rising, rasping screech that gets louder the nearer it gets, so hearing it means it is hunting you. The pistol otherwise has unlimited ammo. The maze also contains the existing bullseye target.
+The bug pursues the player and kills on contact. Aim and fire to blow it up; either the bug or the player can die, so keep your distance. As it closes within three tiles it lets out a rising, rasping screech that gets louder the nearer it gets, so hearing it means it is hunting you. Killing the bug does not end the game: the bullseye tucked into the maze is still the only way to win, so once the smoke clears it is up to you to find it and put a shot through the center. The pistol otherwise has unlimited ammo.
 
 ## Running on your machine
 
@@ -66,7 +67,7 @@ SET BLASTER=A220 I7 D1 T6
 
 Supported IRQs are 5, 7, 9 (also written as 2), and 10; DMA channels are 0, 1, and 3. Missing/invalid settings or an undetected card disable audio without preventing gameplay. Incorrect settings for an installed card must be corrected to match the hardware; the game cannot verify IRQ/DMA wiring.
 
-The approximately 200 ms pistol sample is embedded in the executable; no WAV file or extra sound driver is needed at runtime. Playback starts once per accepted shot and does not wait for the sample to finish. Up to four unsigned 8-bit mono samples at 11,025 Hz can play and mix concurrently. `audio_play_sample` in `audio.h` is the entry point for adding sounds to game events; samples must remain available until playback completes. A synthesized bell-like tone plays when a shot hits the bullseye's center, overlapping the gunshot so the mixer can be tested. The tone is generated at startup and needs no additional runtime file. The bug's scare sound is likewise synthesized in `bug.c` (a dissonant shriek with a climbing pitch, fast flutter, and noise); it is retriggered when the bug is within `BUG_SCARE_DISTANCE` tiles, fades in with proximity, and is spaced by `BUG_SCREECH_FRAMES` so it does not play every frame.
+The approximately 200 ms pistol sample is embedded in the executable; no WAV file or extra sound driver is needed at runtime. Playback starts once per accepted shot and does not wait for the sample to finish. Up to four unsigned 8-bit mono samples at 11,025 Hz can play and mix concurrently. `audio_play_sample` in `audio.h` is the entry point for adding sounds to game events; samples must remain available until playback completes. A synthesized bell-like tone plays when a shot hits the bullseye's center, overlapping the gunshot so the mixer can be tested. The tone is generated at startup and needs no additional runtime file. The bug's scare sound is likewise synthesized in `bug.c` (a dissonant shriek with a climbing pitch, fast flutter, and noise); it is retriggered when the bug is within `BUG_SCARE_DISTANCE` tiles, fades in with proximity, and is spaced by `BUG_SCREECH_FRAMES` so it does not play every frame. Shooting the bug triggers a produced-on-the-fly explosion boom (descending thump, noise burst, and crackle) while an expanding fireball plays at its position.
 See [SOUND.md](SOUND.md) for the recording credit and conversion instructions.
 
 ## Technical Details
@@ -77,3 +78,4 @@ See [SOUND.md](SOUND.md) for the recording credit and conversion instructions.
 - DOS mouse driver (`INT 33h`) relative motion with collision-checked movement
 - Raycasting renderer casting 160 rays across 2-pixel-wide columns
 - Bug sprite is depth-tested against the raycast walls; shots only hit it when unobstructed
+- Bug death runs an 18-frame expanding fireball in the world, composited per column and depth-tested like the bug

@@ -850,6 +850,9 @@ void render_frame(void)
 
         draw_column(screenX, drawStart, drawEnd, lineHeight,
                     tile, side, texX);
+        /* The fireball sits in the world, so it goes under the gun. */
+        draw_bug_explosion_column(screenX, perpWallDist);
+        draw_bug_explosion_column(screenX + 1, perpWallDist);
         /* Overlay immediately so later maze columns cannot erase the gun. */
         draw_weapon_column(screenX);
         /* Composite the bug in the same pass so it persists like the walls. */
@@ -907,10 +910,10 @@ int main(void)
 
     if (bug_game_result() == 1) {
         cprintf("The bug got you! Better luck next time.\r\n");
-    } else if (bug_game_result() == 2) {
-        cprintf("You squashed the bug! You win!\r\n");
     } else if (freeze_remaining == 0) {
         cprintf("Congratulations! You hit the bullseye!\r\n");
+    } else if (bug_killed()) {
+        cprintf("The bug is gone, but the maze still holds a secret...\r\n");
     } else {
         cprintf("Thanks for playing!\r\n");
     }
