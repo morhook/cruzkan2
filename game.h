@@ -9,6 +9,9 @@
 #define COLUMN_W 2
 #define RAY_EPSILON 0.000001
 
+#define MAP_W 16
+#define MAP_H 16
+
 extern unsigned char far *VGA;
 extern double posX;
 extern double posY;

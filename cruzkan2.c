@@ -11,9 +11,6 @@
 #define TEX_SIZE (TEX_W * TEX_H)
 #define NUM_TEXTURES 5
 
-#define MAP_W 16
-#define MAP_H 16
-
 #define MOVE_SPEED 0.10
 #define STRAFE_SPEED 0.08
 #define ROT_SPEED 0.08
@@ -172,6 +169,7 @@ void render_frame(void);
 void fill_frozen_screen(void);
 void init_bullseye_sound(void);
 void play_bullseye(void);
+void init_ghost_sound(void);
 
 void set_video_mode(unsigned char mode)
 {
@@ -715,6 +713,7 @@ void render_frame(void)
     int col;
 
     begin_bug_frame();
+    begin_ghost_frame();
 
     for (col = 0; col < NUM_RAYS; ++col) {
         double cameraX;
@@ -850,14 +849,19 @@ void render_frame(void)
 
         draw_column(screenX, drawStart, drawEnd, lineHeight,
                     tile, side, texX);
-        /* The fireball sits in the world, so it goes under the gun. */
+        /* Explosion effects sit in the world, so they go under the gun. */
         draw_bug_explosion_column(screenX, perpWallDist);
         draw_bug_explosion_column(screenX + 1, perpWallDist);
+        draw_ghost_explosion_column(screenX, perpWallDist);
+        draw_ghost_explosion_column(screenX + 1, perpWallDist);
         /* Overlay immediately so later maze columns cannot erase the gun. */
         draw_weapon_column(screenX);
         /* Composite the bug in the same pass so it persists like the walls. */
         draw_bug_column(screenX, perpWallDist);
         draw_bug_column(screenX + 1, perpWallDist);
+        /* Composite the ghost alongside the bug. */
+        draw_ghost_column(screenX, perpWallDist);
+        draw_ghost_column(screenX + 1, perpWallDist);
     }
 }
 
@@ -879,13 +883,16 @@ void fill_frozen_screen(void)
 
 int main(void)
 {
+    srand((unsigned int)biostime(0, 0L));
     init_audio();
     init_bullseye_sound();
     init_bug_sound();
+    init_ghost_sound();
     install_keyboard();
     set_video_mode(0x13);
     init_palette();
     init_bug_palette();
+    init_ghost_palette();
     init_textures();
     init_mouse();
     weapon_last_tick = (unsigned long)biostime(0, 0L);
@@ -896,8 +903,10 @@ int main(void)
         } else {
             update_player();
             update_bug();
+            update_ghost();
             update_weapon();
             shoot_bug_if_aimed();
+            shoot_ghost_if_aimed();
             render_frame();
         }
         wait_retrace();
@@ -909,11 +918,15 @@ int main(void)
     remove_keyboard();
 
     if (bug_game_result() == 1) {
-        cprintf("The bug got you! Better luck next time.\r\n");
+        cprintf("The spirits got you! Better luck next time.\r\n");
     } else if (freeze_remaining == 0) {
         cprintf("Congratulations! You hit the bullseye!\r\n");
+    } else if (bug_killed() && ghost_killed()) {
+        cprintf("Both entities are banished! You've cleared the maze!\r\n");
     } else if (bug_killed()) {
-        cprintf("The bug is gone, but the maze still holds a secret...\r\n");
+        cprintf("The bug is gone, but the ghost still haunts the maze...\r\n");
+    } else if (ghost_killed()) {
+        cprintf("The ghost has faded, but the bug still prowls...\r\n");
     } else {
         cprintf("Thanks for playing!\r\n");
     }
