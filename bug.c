@@ -529,12 +529,14 @@ void draw_bug_explosion_column(int column, double wall_distance)
 #define GHOST_SPEED 0.018
 #define GHOST_CONTACT_DISTANCE 0.35
 #define GHOST_SHOT_RADIUS 0.26
-#define GHOST_COLOR_BASE 56
+/* Keep every ghost color above the weapon/texture/bug ranges: the palette
+   is shared, so overlapping indices would recolor the gun and walls. */
+#define GHOST_COLOR_BASE 76
 #define GHOST_TELEPORT_MIN 90
 #define GHOST_TELEPORT_MAX 200
 #define GHOST_SCARE_DISTANCE 2.8
 #define GHOST_SCREECH_FRAMES 45
-#define GHOST_EXPLOSION_COLOR_BASE 50
+#define GHOST_EXPLOSION_COLOR_BASE 82
 #define GHOST_EXPLOSION_FRAMES 20
 
 static double ghost_x = 13.5;
