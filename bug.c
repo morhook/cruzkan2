@@ -534,6 +534,7 @@ void draw_bug_explosion_column(int column, double wall_distance)
 #define GHOST_COLOR_BASE 76
 #define GHOST_TELEPORT_MIN 90
 #define GHOST_TELEPORT_MAX 200
+#define GHOST_TELEPORT_SHIMMER 15
 #define GHOST_SCARE_DISTANCE 2.8
 #define GHOST_SCREECH_FRAMES 45
 #define GHOST_EXPLOSION_COLOR_BASE 82
@@ -542,7 +543,8 @@ void draw_bug_explosion_column(int column, double wall_distance)
 static double ghost_x = 13.5;
 static double ghost_y = 12.5;
 static int ghost_alive = 1;
-static unsigned int ghost_teleport_wait = 0;
+static unsigned int ghost_screech_wait = 0;
+static int ghost_teleport_charge = 0;
 static int ghost_teleporting = 0;
 static int ghost_teleport_timer = 0;
 
@@ -701,25 +703,50 @@ static void try_ghost_teleport(void)
     int tx;
     int ty;
     int attempts;
+    int best_x;
+    int best_y;
+    double dx;
+    double dy;
+    double best_distance;
 
     /* Pick a random floor tile far enough from the player. */
     attempts = 0;
     do {
         tx = 1 + (rand() % (MAP_W - 2));
         ty = 1 + (rand() % (MAP_H - 2));
+        dx = (double)tx + 0.5 - posX;
+        dy = (double)ty + 0.5 - posY;
         ++attempts;
     } while ((is_wall(tx, ty) ||
-              fabs((double)tx - posX) < 3.0 ||
-              fabs((double)ty - posY) < 3.0) &&
-             attempts < 50);
+              (dx * dx + dy * dy) < 9.0) &&
+             attempts < 100);
 
-    if (attempts < 50) {
-        ghost_x = (double)tx + 0.5;
-        ghost_y = (double)ty + 0.5;
-        ghost_teleporting = 1;
-        ghost_teleport_timer = 15; /* frames of shimmer */
-        play_ghost_wail();
+    /* Fallback: use the farthest floor tile from the player. */
+    if (is_wall(tx, ty) || (dx * dx + dy * dy) < 9.0) {
+        best_x = tx;
+        best_y = ty;
+        best_distance = -1.0;
+        for (ty = 1; ty < MAP_H - 1; ++ty) {
+            for (tx = 1; tx < MAP_W - 1; ++tx) {
+                if (is_wall(tx, ty)) continue;
+                dx = (double)tx + 0.5 - posX;
+                dy = (double)ty + 0.5 - posY;
+                if (dx * dx + dy * dy > best_distance) {
+                    best_distance = dx * dx + dy * dy;
+                    best_x = tx;
+                    best_y = ty;
+                }
+            }
+        }
+        tx = best_x;
+        ty = best_y;
     }
+
+    ghost_x = (double)tx + 0.5;
+    ghost_y = (double)ty + 0.5;
+    ghost_teleporting = 1;
+    ghost_teleport_timer = GHOST_TELEPORT_SHIMMER;
+    play_ghost_wail();
 }
 
 static void begin_ghost_explosion_frame(void)
@@ -784,10 +811,6 @@ void update_ghost(void)
         return;
     }
 
-    if (ghost_teleport_wait > 0) {
-        --ghost_teleport_wait;
-    }
-
     dx = posX - ghost_x;
     dy = posY - ghost_y;
     distance = sqrt(dx * dx + dy * dy);
@@ -796,6 +819,20 @@ void update_ghost(void)
         game_result = 1;
         return;
     }
+
+    if (ghost_screech_wait > 0) {
+        --ghost_screech_wait;
+    }
+
+    /* Charging a teleport: hold still (still deadly to touch), then vanish. */
+    if (ghost_teleport_charge > 0) {
+        --ghost_teleport_charge;
+        if (ghost_teleport_charge == 0) {
+            try_ghost_teleport();
+        }
+        return;
+    }
+
     if (distance < 0.001) return;
 
     step = GHOST_SPEED / distance;
@@ -811,15 +848,15 @@ void update_ghost(void)
     }
 
     /* Screech when close. */
-    if (distance <= GHOST_SCARE_DISTANCE && ghost_teleport_wait == 0) {
-        ghost_teleport_wait = GHOST_SCREECH_FRAMES;
+    if (distance <= GHOST_SCARE_DISTANCE && ghost_screech_wait == 0) {
+        ghost_screech_wait = GHOST_SCREECH_FRAMES;
         play_ghost_screech(distance);
     }
 
-    /* Teleport away if the player gets too close. */
+    /* Player got too close: wind up, then teleport away. */
     if (distance < 1.8) {
-        ghost_teleport_wait = GHOST_TELEPORT_MIN +
-                              (rand() % (GHOST_TELEPORT_MAX - GHOST_TELEPORT_MIN));
+        ghost_teleport_charge = GHOST_TELEPORT_MIN +
+            (rand() % (GHOST_TELEPORT_MAX - GHOST_TELEPORT_MIN));
     }
 }
 
@@ -879,6 +916,7 @@ void draw_ghost_column(int column, double wall_distance)
     int screen_y;
     char pixel;
     unsigned int offset;
+    int shimmer;
 
     if (!ghost_visible || column < ghost_first_column ||
         column > ghost_last_column) return;
@@ -898,9 +936,14 @@ void draw_ghost_column(int column, double wall_distance)
         if (source_x < 0 || source_x > 5) continue;
 
         /* Teleport shimmer: skip pixels for a flash effect. */
-        if (ghost_teleporting &&
-            (((column * 7 + y * 11 + ghost_teleport_timer * 3) & 3) == 0))
-            continue;
+        if (ghost_teleporting ||
+            (ghost_teleport_charge > 0 &&
+             ghost_teleport_charge <= GHOST_TELEPORT_SHIMMER)) {
+            shimmer = ghost_teleporting ? ghost_teleport_timer
+                                        : ghost_teleport_charge;
+            if (((column * 7 + y * 11 + shimmer * 3) & 3) == 0)
+                continue;
+        }
 
         offset = (unsigned int)screen_y * SCREEN_W + column;
         VGA[offset] = (unsigned char)(GHOST_COLOR_BASE + source_x);
